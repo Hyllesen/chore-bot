@@ -200,12 +200,16 @@ async def unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         await update.message.reply_text("Invalid user ID.")
 
+async def post_init(app: Application):
+    await database.init_db()
+    logger.info("Bot started")
+
 def main():
     if not BOT_TOKEN:
         logger.error("BOT_TOKEN environment variable is required")
         sys.exit(1)
 
-    app = Application.builder().token(BOT_TOKEN).build()
+    app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
 
     # Commands
     app.add_handler(CommandHandler("start", start))
@@ -224,11 +228,6 @@ def main():
     # Message handler (plain text = chore entry)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # Initialize database
-    loop = app.loop
-    loop.run_until_complete(database.init_db())
-
-    logger.info("Bot started")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
