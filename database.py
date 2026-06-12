@@ -88,6 +88,16 @@ async def unban_user(user_id: int):
         )
         await conn.commit()
 
+async def get_chores_since(since_timestamp: str) -> list[dict]:
+    """Get all chores created after a given ISO timestamp."""
+    async with get_connection() as conn:
+        cursor = await conn.execute(
+            "SELECT user_id, username, chore_text, created_at FROM chores WHERE created_at > ? ORDER BY created_at ASC",
+            (since_timestamp,),
+        )
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
+
 async def get_stats() -> dict:
     async with get_connection() as conn:
         cursor = await conn.execute("SELECT COUNT(*) as count FROM chores")

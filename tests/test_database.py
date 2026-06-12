@@ -48,6 +48,28 @@ async def test_stats():
     assert stats["active_users"] == 2
 
 @pytest.mark.asyncio
+async def test_get_chores_since():
+    import datetime
+    from time import sleep
+
+    # SQLite CURRENT_TIMESTAMP is UTC, so use UTC time for the cutoff
+    await database.add_chore(1, "alice", "before")
+    sleep(1.1)
+    cutoff = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
+    sleep(1.1)
+    await database.add_chore(2, "bob", "after")
+
+    since = await database.get_chores_since(cutoff)
+    assert len(since) == 1
+    assert since[0]["chore_text"] == "after"
+    assert since[0]["username"] == "bob"
+    assert since[0]["user_id"] == 2
+
+    # With an earlier cutoff, both should appear
+    since_early = await database.get_chores_since("2020-01-01 00:00:00")
+    assert len(since_early) == 2
+
+@pytest.mark.asyncio
 async def test_get_chores_orders_desc():
     await database.add_chore(123, "alice", "first")
     await database.add_chore(123, "alice", "second")

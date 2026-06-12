@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from telegram.ext import ContextTypes
 
-from bot import chore, chores, clear_chores, handle_message, start
+from bot import chore, chores, clear_chores, handle_message, start, send_daily_report, last_report_time
 
 def make_update(text, user_id=123, username="alice"):
     user = MagicMock()
@@ -100,3 +100,52 @@ async def test_banned_user():
 
         response = update.message.reply_text.call_args[0][0]
         assert "banned" in response.lower()
+
+@pytest.mark.asyncio
+async def test_send_daily_report_formats_summary():
+    context = MagicMock(spec=ContextTypes.DEFAULT_TYPE)
+    context.bot = MagicMock()
+    context.bot.send_message = AsyncMock()
+
+    mock_chores = [
+        {"user_id": 1, "username": "alice", "chore_text": "washed dishes", "created_at": "2024-01-01T10:00:00"},
+        {"user_id": 1, "username": "alice", "chore_text": "vacuumed", "created_at": "2024-01-01T14:00:00"},
+        {"user_id": 2, "username": "bob", "chore_text": "cooked dinner", "created_at": "2024-01-01T18:00:00"},
+    ]
+
+    with patch("bot.REPORT_CHAT_ID", "12345"):
+        with patch("bot.database.get_chores_since", new_callable=AsyncMock) as mock_since:
+            mock_since.return_value = mock_chores
+            await send_daily_report(context)
+
+            context.bot.send_message.assert_called_once()
+            call_kwargs = context.bot.send_message.call_args[1]
+            text = call_kwargs["text"]
+
+            assert "Daily Chore Summary" in text
+            assert "alice: washed dishes, vacuumed" in text
+            assert "bob: cooked dinner" in text
+            assert "Total: 3 chore" in text
+            assert "2 person" in text
+            assert call_kwargs["parse_mode"] == "Markdown"
+
+@pytest.mark.asyncio
+async def test_send_daily_report_skips_without_report_chat_id():
+    context = MagicMock(spec=ContextTypes.DEFAULT_TYPE)
+
+    with patch("bot.REPORT_CHAT_ID", None):
+        await send_daily_report(context)
+        # Should not raise and should not send
+
+@pytest.mark.asyncio
+async def test_send_daily_report_skips_when_no_chores():
+    context = MagicMock(spec=ContextTypes.DEFAULT_TYPE)
+    context.bot = MagicMock()
+    context.bot.send_message = AsyncMock()
+
+    with patch("bot.REPORT_CHAT_ID", "12345"):
+        with patch("bot.database.get_chores_since", new_callable=AsyncMock) as mock_since:
+            mock_since.return_value = []
+            await send_daily_report(context)
+
+            context.bot.send_message.assert_not_called

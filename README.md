@@ -57,4 +57,9 @@ python bot.py
 | `/ban <user_id>` | Ban a user (admin only) |
 | `/unban <user_id>` | Unban a user (admin only) |
 
+## Daily Summary
+
+At 5 AM Manila time, the bot sends a daily chore summary to the group chat.
+Set `REPORT_CHAT_ID` in your `.env` to the chat ID of the group chat.
+
 You can also just type any message and it will be logged automatically.

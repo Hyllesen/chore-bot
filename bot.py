@@ -1,6 +1,10 @@
 import os
 import sys
 import logging
+from datetime import datetime, timedelta
+from collections import defaultdict
+
+import pytz
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -10,6 +14,7 @@ from telegram.ext import (
     CallbackQueryHandler,
     filters,
     ContextTypes,
+    JobQueue,
 )
 
 import database
@@ -22,6 +27,12 @@ logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 ADMIN_CHAT_ID = int(os.environ.get("ADMIN_CHAT_ID", "0"))
+REPORT_CHAT_ID = os.environ.get("REPORT_CHAT_ID")
+
+MANILA_TZ = pytz.timezone("Asia/Manila")
+
+# Track the last time the daily report was sent (initialized to now on startup)
+last_report_time = datetime.now(MANILA_TZ)
 
 QUICK_CHORES = [
     ("🍽️ Dishes", "washed dishes"),
@@ -200,16 +211,66 @@ async def unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         await update.message.reply_text("Invalid user ID.")
 
+async def send_daily_report(context: ContextTypes.DEFAULT_TYPE):
+    """Send a daily chore summary to the group chat."""
+    global last_report_time
+
+    if not REPORT_CHAT_ID:
+        logger.warning("REPORT_CHAT_ID not set, skipping daily report")
+        return
+
+    since = last_report_time.astimezone(pytz.UTC).strftime("%Y-%m-%d %H:%M:%S")
+    chores = await database.get_chores_since(since)
+
+    if not chores:
+        logger.info("No chores since last report, skipping")
+        last_report_time = datetime.now(MANILA_TZ)
+        return
+
+    # Group by user
+    user_chores = defaultdict(list)
+    for chore in chores:
+        name = chore["username"] or f"User {chore['user_id']}"
+        user_chores[name].append(chore["chore_text"])
+
+    # Format message
+    lines = ["📋 **Daily Chore Summary**", ""]
+    for name, chores_list in user_chores.items():
+        chores_str = ", ".join(chores_list)
+        lines.append(f"👤 {name}: {chores_str}")
+
+    total_chores = sum(len(v) for v in user_chores.values())
+    lines.append(f"\nTotal: {total_chores} chore(s) by {len(user_chores)} person(s)")
+
+    message = "\n".join(lines)
+
+    try:
+        await context.bot.send_message(chat_id=REPORT_CHAT_ID, text=message, parse_mode="Markdown")
+        logger.info("Daily report sent")
+    except Exception:
+        logger.exception("Failed to send daily report")
+
+    last_report_time = datetime.now(MANILA_TZ)
+
 async def post_init(app: Application):
+    global last_report_time
     await database.init_db()
-    logger.info("Bot started")
+
+    # Schedule daily report at 5 AM Manila time
+    manila_5am = datetime.strptime("05:00", "%H:%M").replace(tzinfo=MANILA_TZ).time()
+    app.job_queue.run_daily(
+        send_daily_report,
+        time=manila_5am,
+        name="daily_report",
+    )
+    logger.info("Bot started — daily report scheduled at 5 AM Manila")
 
 def main():
     if not BOT_TOKEN:
         logger.error("BOT_TOKEN environment variable is required")
         sys.exit(1)
 
-    app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
+    app = Application.builder().token(BOT_TOKEN).post_init(post_init).job_queue(JobQueue()).build()
 
     # Commands
     app.add_handler(CommandHandler("start", start))
