@@ -123,10 +123,16 @@ async def test_send_daily_report_formats_summary():
             text = call_kwargs["text"]
 
             assert "Daily Chore Summary" in text
-            assert "alice: washed dishes, vacuumed" in text
-            assert "bob: cooked dinner" in text
-            assert "Total: 3 chore" in text
-            assert "2 person" in text
+            assert "📅" in text
+            assert "━━━━━━━━━━━━━━━━━━━━" in text
+            assert "alice" in text
+            assert "washed dishes" in text
+            assert "vacuumed" in text
+            assert "bob" in text
+            assert "cooked dinner" in text
+            assert "(2 chore" in text
+            assert "(1 chore)" in text
+            assert "3 chores completed by 2 persons" in text
             assert call_kwargs["parse_mode"] == "Markdown"
 
 @pytest.mark.asyncio

@@ -234,13 +234,27 @@ async def send_daily_report(context: ContextTypes.DEFAULT_TYPE):
         user_chores[name].append(chore["chore_text"])
 
     # Format message
-    lines = ["📋 **Daily Chore Summary**", ""]
+    today_str = datetime.now(MANILA_TZ).strftime("%a, %b %d")
+    lines = [
+        f"📋 **Daily Chore Summary**",
+        f"📅 {today_str}",
+        "",
+        "━━━━━━━━━━━━━━━━━━━━",
+        "",
+    ]
     for name, chores_list in user_chores.items():
-        chores_str = ", ".join(chores_list)
-        lines.append(f"👤 {name}: {chores_str}")
+        lines.append(f"🙋 **{name}** ({len(chores_list)} chore{'s' if len(chores_list) != 1 else ''})")
+        for chore_text in chores_list:
+            lines.append(f"• {chore_text}")
+        lines.append("")
 
     total_chores = sum(len(v) for v in user_chores.values())
-    lines.append(f"\nTotal: {total_chores} chore(s) by {len(user_chores)} person(s)")
+    lines.append("━━━━━━━━━━━━━━━━━━━━")
+    lines.append("")
+    lines.append(
+        f"✅ {total_chores} chore{'s' if total_chores != 1 else ''} "
+        f"completed by {len(user_chores)} person{'s' if len(user_chores) != 1 else ''}"
+    )
 
     message = "\n".join(lines)
 
