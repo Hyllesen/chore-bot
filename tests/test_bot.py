@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from telegram.ext import ContextTypes
 
 import bot
-from bot import chore, chores, clear_chores, handle_message, start, send_daily_report
+from bot import chore, chores, clear_chores, handle_message, start, send_daily_report, send_weekly_report
 
 def make_update(text, user_id=123, username="alice"):
     user = MagicMock()
@@ -36,9 +36,7 @@ async def test_chore_command():
             await chore(update, context)
 
             mock_add.assert_called_once_with(123, "alice", "washed dishes")
-            update.message.reply_text.assert_called_once()
-            response = update.message.reply_text.call_args[0][0]
-            assert "washed dishes" in response
+            update.message.reply_text.assert_called_once_with("✅ Logged")
 
 @pytest.mark.asyncio
 async def test_chore_command_no_text():
@@ -63,7 +61,7 @@ async def test_handle_message_logs_chore():
             await handle_message(update, context)
 
             mock_add.assert_called_once_with(123, "alice", "did the laundry")
-            update.message.reply_text.assert_called_once()
+            update.message.reply_text.assert_called_once_with("✅ Logged")
 
 @pytest.mark.asyncio
 async def test_clear_chores():
@@ -160,5 +158,61 @@ async def test_send_daily_report_skips_when_no_chores():
         with patch("bot.database.get_chores_since", new_callable=AsyncMock) as mock_since:
             mock_since.return_value = []
             await send_daily_report(context)
+
+            context.bot.send_message.assert_not_called
+
+
+@pytest.mark.asyncio
+async def test_send_weekly_report_formats_summary():
+    context = MagicMock(spec=ContextTypes.DEFAULT_TYPE)
+    context.bot = MagicMock()
+    context.bot.send_message = AsyncMock()
+
+    mock_chores = [
+        {"user_id": 1, "username": "alice", "chore_text": "washed dishes", "created_at": "2024-06-10 01:00:00"},
+        {"user_id": 1, "username": "alice", "chore_text": "vacuumed", "created_at": "2024-06-11 05:00:00"},
+        {"user_id": 2, "username": "bob", "chore_text": "cooked dinner", "created_at": "2024-06-12 10:00:00"},
+    ]
+
+    with patch("bot.REPORT_CHAT_ID", "12345"):
+        with patch("bot.database.get_chores_between", new_callable=AsyncMock) as mock_between:
+            mock_between.return_value = mock_chores
+            await send_weekly_report(context)
+
+            context.bot.send_message.assert_called_once()
+            call_kwargs = context.bot.send_message.call_args[1]
+            text = call_kwargs["text"]
+
+            assert "Weekly Chore Summary" in text
+            assert "alice" in text
+            assert "bob" in text
+            assert "washed dishes" in text
+            assert "vacuumed" in text
+            assert "cooked dinner" in text
+            assert "Monday" in text
+            assert "Tuesday" in text
+            assert "Wednesday" in text
+            assert "this week" in text
+            assert call_kwargs["parse_mode"] == "Markdown"
+
+
+@pytest.mark.asyncio
+async def test_send_weekly_report_skips_without_report_chat_id():
+    context = MagicMock(spec=ContextTypes.DEFAULT_TYPE)
+
+    with patch("bot.REPORT_CHAT_ID", None):
+        await send_weekly_report(context)
+
+
+@pytest.mark.asyncio
+async def test_send_weekly_report_skips_when_no_chores():
+    context = MagicMock(spec=ContextTypes.DEFAULT_TYPE)
+    context.bot = MagicMock()
+    context.bot.send_message = AsyncMock()
+
+    with patch("bot.REPORT_CHAT_ID", "12345"):
+        with patch("bot.database.get_chores_between", new_callable=AsyncMock) as mock_between:
+            mock_between.return_value = []
+            await send_weekly_report(context)
 
             context.bot.send_message.assert_not_called

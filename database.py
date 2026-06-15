@@ -106,6 +106,16 @@ async def get_chores_since(since_timestamp: str) -> list[dict]:
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
 
+async def get_chores_between(start: str, end: str) -> list[dict]:
+    """Get all chores created within a time range [start, end)."""
+    async with get_connection() as conn:
+        cursor = await conn.execute(
+            "SELECT user_id, username, chore_text, created_at FROM chores WHERE created_at >= ? AND created_at < ? ORDER BY created_at ASC",
+            (start, end),
+        )
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
+
 async def get_last_report_time() -> str | None:
     async with get_connection() as conn:
         cursor = await conn.execute(

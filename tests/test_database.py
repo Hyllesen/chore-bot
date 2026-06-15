@@ -38,6 +38,28 @@ async def test_ban_and_unban():
     assert not await database.is_banned(999)
 
 @pytest.mark.asyncio
+async def test_get_chores_between():
+    from datetime import datetime, timedelta, timezone
+    from time import sleep
+
+    await database.add_chore(1, "alice", "chore 1")
+    sleep(0.5)
+    mid = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    sleep(0.5)
+    await database.add_chore(2, "bob", "chore 2")
+    sleep(0.5)
+    await database.add_chore(1, "alice", "chore 3")
+
+    between = await database.get_chores_between("2020-01-01 00:00:00", mid)
+    assert len(between) == 1
+    assert between[0]["chore_text"] == "chore 1"
+
+    between2 = await database.get_chores_between(mid, "2099-01-01 00:00:00")
+    assert len(between2) == 2
+    assert between2[0]["chore_text"] == "chore 2"
+    assert between2[1]["chore_text"] == "chore 3"
+
+@pytest.mark.asyncio
 async def test_stats():
     await database.add_chore(1, "alice", "a")
     await database.add_chore(1, "alice", "b")
