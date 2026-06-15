@@ -381,7 +381,7 @@ def main():
         sys.exit(1)
 
     app = Application.builder().token(BOT_TOKEN).post_init(post_init).job_queue(
-        JobQueue(BackgroundScheduler(timezone=MANILA_TZ))
+        JobQueue(scheduler=BackgroundScheduler(timezone=MANILA_TZ))
     ).build()
 
     # Commands
