@@ -7,8 +7,6 @@ from collections import defaultdict
 import pytz
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from apscheduler.schedulers.background import BackgroundScheduler
-
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -346,6 +344,9 @@ async def post_init(app: Application):
     global last_report_time
     await database.init_db()
 
+    # Configure scheduler to use Manila time so cron jobs run at correct local time
+    app.job_queue.scheduler.configure(timezone=MANILA_TZ)
+
     # Restore last report time from database to survive restarts
     stored = await database.get_last_report_time()
     if stored:
@@ -380,9 +381,7 @@ def main():
         logger.error("BOT_TOKEN environment variable is required")
         sys.exit(1)
 
-    app = Application.builder().token(BOT_TOKEN).post_init(post_init).job_queue(
-        JobQueue(scheduler=BackgroundScheduler(timezone=MANILA_TZ))
-    ).build()
+    app = Application.builder().token(BOT_TOKEN).post_init(post_init).job_queue(JobQueue()).build()
 
     # Commands
     app.add_handler(CommandHandler("start", start))
