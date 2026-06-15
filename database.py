@@ -34,6 +34,14 @@ async def init_db():
             )
             """
         )
+        await conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS meta (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+            """
+        )
         await conn.commit()
 
 async def add_chore(user_id: int, username: str | None, chore_text: str) -> int:
@@ -97,6 +105,22 @@ async def get_chores_since(since_timestamp: str) -> list[dict]:
         )
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
+
+async def get_last_report_time() -> str | None:
+    async with get_connection() as conn:
+        cursor = await conn.execute(
+            "SELECT value FROM meta WHERE key = 'last_report_time'"
+        )
+        row = await cursor.fetchone()
+        return row["value"] if row else None
+
+async def set_last_report_time(iso_timestamp: str):
+    async with get_connection() as conn:
+        await conn.execute(
+            "INSERT OR REPLACE INTO meta (key, value) VALUES ('last_report_time', ?)",
+            (iso_timestamp,),
+        )
+        await conn.commit()
 
 async def get_stats() -> dict:
     async with get_connection() as conn:

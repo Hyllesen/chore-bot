@@ -1,9 +1,12 @@
+from datetime import datetime
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from telegram.ext import ContextTypes
 
-from bot import chore, chores, clear_chores, handle_message, start, send_daily_report, last_report_time
+import bot
+from bot import chore, chores, clear_chores, handle_message, start, send_daily_report
 
 def make_update(text, user_id=123, username="alice"):
     user = MagicMock()
@@ -107,6 +110,8 @@ async def test_send_daily_report_formats_summary():
     context.bot = MagicMock()
     context.bot.send_message = AsyncMock()
 
+    bot.last_report_time = datetime(2024, 1, 1, tzinfo=bot.MANILA_TZ)
+
     mock_chores = [
         {"user_id": 1, "username": "alice", "chore_text": "washed dishes", "created_at": "2024-01-01T10:00:00"},
         {"user_id": 1, "username": "alice", "chore_text": "vacuumed", "created_at": "2024-01-01T14:00:00"},
@@ -148,6 +153,8 @@ async def test_send_daily_report_skips_when_no_chores():
     context = MagicMock(spec=ContextTypes.DEFAULT_TYPE)
     context.bot = MagicMock()
     context.bot.send_message = AsyncMock()
+
+    bot.last_report_time = datetime(2024, 1, 1, tzinfo=bot.MANILA_TZ)
 
     with patch("bot.REPORT_CHAT_ID", "12345"):
         with patch("bot.database.get_chores_since", new_callable=AsyncMock) as mock_since:

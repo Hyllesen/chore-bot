@@ -31,8 +31,9 @@ REPORT_CHAT_ID = os.environ.get("REPORT_CHAT_ID")
 
 MANILA_TZ = pytz.timezone("Asia/Manila")
 
-# Track the last time the daily report was sent (initialized to now on startup)
-last_report_time = datetime.now(MANILA_TZ)
+# Track the last time the daily report was sent
+# Initialized in post_init from database; falls back to now on first run
+last_report_time: datetime | None = None
 
 QUICK_CHORES = [
     ("🍽️ Dishes", "washed dishes"),
@@ -225,6 +226,7 @@ async def send_daily_report(context: ContextTypes.DEFAULT_TYPE):
     if not chores:
         logger.info("No chores since last report, skipping")
         last_report_time = datetime.now(MANILA_TZ)
+        await database.set_last_report_time(last_report_time.isoformat())
         return
 
     # Group by user
@@ -265,10 +267,21 @@ async def send_daily_report(context: ContextTypes.DEFAULT_TYPE):
         logger.exception("Failed to send daily report")
 
     last_report_time = datetime.now(MANILA_TZ)
+    await database.set_last_report_time(last_report_time.isoformat())
 
 async def post_init(app: Application):
     global last_report_time
     await database.init_db()
+
+    # Restore last report time from database to survive restarts
+    stored = await database.get_last_report_time()
+    if stored:
+        last_report_time = datetime.fromisoformat(stored)
+    else:
+        last_report_time = datetime.now(MANILA_TZ)
+        await database.set_last_report_time(last_report_time.isoformat())
+
+    logger.info("Last report time restored: %s", last_report_time)
 
     # Schedule daily report at 5 AM Manila time
     manila_5am = datetime.strptime("05:00", "%H:%M").replace(tzinfo=MANILA_TZ).time()

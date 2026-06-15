@@ -29,5 +29,6 @@ async def setup_db():
     async with database.get_connection() as conn:
         await conn.execute("DELETE FROM chores")
         await conn.execute("DELETE FROM banned_users")
+        await conn.execute("DELETE FROM meta")
         await conn.commit()
     yield
