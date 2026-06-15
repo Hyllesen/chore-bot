@@ -366,12 +366,12 @@ async def post_init(app: Application):
     )
     logger.info("Bot started — daily report scheduled at 5 AM Manila")
 
-    # Schedule weekly report at 9 AM Monday Manila time
+    # Schedule weekly report at 9 AM Monday Manila time (cron: 1=Monday)
     manila_9am = datetime.strptime("09:00", "%H:%M").replace(tzinfo=MANILA_TZ).time()
     app.job_queue.run_daily(
         send_weekly_report,
         time=manila_9am,
-        days=(0,),
+        days=(1,),
         name="weekly_report",
     )
     logger.info("Weekly report scheduled at 9 AM Monday Manila")
