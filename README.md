@@ -62,4 +62,21 @@ python bot.py
 At 5 AM Manila time, the bot sends a daily chore summary to the group chat.
 Set `REPORT_CHAT_ID` in your `.env` to the chat ID of the group chat.
 
+The last report time is persisted in the database, so bot restarts won't cause
+any chores to be missed.
+
 You can also just type any message and it will be logged automatically.
+
+## Deployment
+
+This project runs on a **greencloud VPS** under `/opt/chore-bot/` using Docker.
+
+### Deploying updates
+
+```bash
+git push greencloud main
+ssh root@greencloud
+cd /opt/chore-bot
+git pull origin main
+docker compose up -d --build
+```
